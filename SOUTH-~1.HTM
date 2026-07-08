@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>South Barrington → Ann Arbor: Mini Golf Road Trip</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f8; color: #222; }
+  header { background: #14532d; color: #fff; padding: 14px 22px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+  header h1 { font-size: 1.2rem; font-weight: 600; }
+  header .sub { font-size: .85rem; opacity: .85; }
+  .toggle { margin-left: auto; display: flex; gap: 8px; }
+  .toggle button { border: 2px solid #fff; background: transparent; color: #fff; padding: 6px 14px; border-radius: 20px; cursor: pointer; font-size: .85rem; font-weight: 600; }
+  .toggle button.active { background: #fff; color: #14532d; }
+  .wrap { display: flex; height: calc(100vh - 60px); }
+  #map { flex: 1; min-width: 0; }
+  aside { width: 380px; overflow-y: auto; background: #fff; border-left: 1px solid #ddd; padding: 16px; }
+  aside h2 { font-size: .95rem; margin: 14px 0 8px; padding-bottom: 4px; border-bottom: 2px solid #eee; }
+  aside h2.t15 { color: #15803d; border-color: #15803d; }
+  aside h2.t30 { color: #c2410c; border-color: #c2410c; }
+  .course { display: flex; gap: 10px; padding: 8px 6px; border-radius: 8px; cursor: pointer; align-items: flex-start; }
+  .course:hover { background: #f0f7f2; }
+  .badge { flex: 0 0 26px; height: 26px; border-radius: 50%; color: #fff; font-weight: 700; font-size: .85rem; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
+  .b15 { background: #15803d; }
+  .b30 { background: #ea580c; }
+  .course .name { font-weight: 600; font-size: .9rem; }
+  .course .meta { font-size: .78rem; color: #666; margin: 1px 0; }
+  .course a { font-size: .8rem; color: #1d4ed8; word-break: break-all; }
+  .note { font-size: .75rem; color: #777; margin-top: 16px; line-height: 1.4; }
+  .marker-pin { border-radius: 50%; color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.5); font-size: 13px; }
+  .pin15 { background: #15803d; }
+  .pin30 { background: #ea580c; }
+  .pin-end { background: #1e3a8a; font-size: 15px; }
+  .leaflet-popup-content { font-size: .85rem; }
+  .leaflet-popup-content b { font-size: .9rem; }
+  @media (max-width: 800px) { .wrap { flex-direction: column; height: auto; } #map { height: 60vh; } aside { width: 100%; } }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>⛳ South Barrington, IL → Ann Arbor, MI</h1>
+    <div class="sub">~280 miles · ~4.5 hrs via I-90 E &amp; I-94 E · mini golf along the way</div>
+  </div>
+  <div class="toggle">
+    <button id="btn15" class="active" onclick="setTier(15)">Within ~15 min</button>
+    <button id="btn30" onclick="setTier(30)">Within ~30 min (all)</button>
+  </div>
+</header>
+<div class="wrap">
+  <div id="map"></div>
+  <aside>
+    <h2 class="t15">Within ~15 min of route (A–K)</h2>
+    <div id="list15"></div>
+    <h2 class="t30" id="hdr30">15–30 min detour (1–4)</h2>
+    <div id="list30"></div>
+    <p class="note">Route: I-90 E (Jane Addams/Kennedy) → Chicago Skyway → Indiana Toll Rd → I-94 E through Michigan City, Benton Harbor, Kalamazoo, Battle Creek &amp; Jackson to Ann Arbor.<br><br>
+    Detour times are one-way estimates from the highway. Marker positions are approximate — confirm addresses on each site. Many courses are seasonal (roughly April–October); Big Mini Putt Club is a bar (under-21 only before 8 PM with an adult). Putting Edge (Hoffman Estates) was excluded — permanently closed. Click any list entry to zoom to it.</p>
+  </aside>
+</div>
+<script>
+const courses15 = [
+  {id:'A', name:'Congo River Golf & Exploration', loc:'1325 N Barrington Rd, Hoffman Estates, IL', detour:'~5 min · I-90 exit at Barrington Rd (right at the start)', url:'https://golfcongoriver.com', ll:[42.053,-88.144], desc:'Two 18-hole African-adventure courses with waterfalls & caves'},
+  {id:'B', name:'Big Mini Putt Club – Wicker Park', loc:'1302 N Milwaukee Ave, Chicago, IL', detour:'~5 min · Kennedy Expy, Division St exit', url:'https://bigminiputtclub.com', ll:[41.9046,-87.6672], desc:'9-hole indoor mini golf bar (minors before 8 PM w/ adult)'},
+  {id:'C', name:'City Mini Golf – Maggie Daley Park', loc:'337 E Randolph St, Chicago, IL', detour:'~10 min · downtown, next to Millennium Park', url:'https://www.cityminigolf.com', ll:[41.8826,-87.6194], desc:'18 Chicago-themed holes with skyline views'},
+  {id:'D', name:"Inman's – Sandy Harbor Mini Golf", loc:'3201 Evans Ave, Valparaiso, IN', detour:'~12 min · I-94 exit 26, SR-49 south', url:'https://www.inmansbowl.com/sandy-harbor-outdoor-attractions.html', ll:[41.489,-87.045], desc:'18-hole outdoor course + go-karts, bumper boats, arcade'},
+  {id:'E', name:'Zao Island', loc:'1050 Horse Prairie Ave, Valparaiso, IN', detour:'~15 min · I-94 exit 26, SR-49 south', url:'https://zaoisland.com', ll:[41.445,-87.063], desc:'Adventure mini golf, go-karts, laser tag'},
+  {id:'F', name:"Captain Mike's Fun Park", loc:'10975 Red Arrow Hwy, Bridgman, MI', detour:'~5 min · between I-94 exits 12 & 16', url:'https://captainmikesamusementpark.com', ll:[41.925,-86.585], desc:'18 holes w/ 30-ft lighthouse, near Warren Dunes'},
+  {id:'G', name:'Hidden Pointe Fun Park', loc:'Nickerson Ave, Benton Harbor, MI', detour:'~5 min · between I-94 exits 28 & 29', url:'https://www.hiddenpointe.net', ll:[42.085,-86.437], desc:'18-hole course, batting cages & arcade right off I-94'},
+  {id:'H', name:'Airway Fun Center', loc:'5626 Portage Rd, Portage (Kalamazoo), MI', detour:'~10 min · I-94 exit 78 (Portage Rd)', url:'https://www.airwayfuncenter.com', ll:[42.245,-85.564], desc:'Outdoor mini golf + bowling, laser tag, arcade'},
+  {id:'I', name:'Hit-Em Here Family Fun Center', loc:'1790 E Columbia Ave, Battle Creek, MI', detour:'~8 min · I-94 exit 100', url:'https://www.hitemhere.com', ll:[42.287,-85.148], desc:'2 mini golf courses, driving range, batting cages'},
+  {id:'J', name:'Apex Sports & Entertainment (Jurassic Golf)', loc:'3600 Wayland Dr, Jackson, MI', detour:'~10 min · I-94 exit 138 (US-127)', url:'https://apexsportsjxn.com', ll:[42.276,-84.456], desc:'18-hole dinosaur-themed course + go-karts'},
+  {id:'K', name:'Putterz Golf & Games', loc:'2675 Washtenaw Ave, Ypsilanti, MI', detour:'~10 min · just past Ann Arbor via US-23/Washtenaw', url:'https://www.putterz.com', ll:[42.247,-83.662], desc:'54 holes (3 classic courses), arcade & batting cages'}
+];
+const courses30 = [
+  {id:'1', name:'Novelty Golf & Games', loc:'3650 W Devon Ave, Lincolnwood, IL', detour:'~20 min from the Kennedy', url:'https://noveltygolf.com', ll:[41.9975,-87.7175], desc:'Chicagoland classic since 1949 — two 18-hole courses + Bunny Hutch'},
+  {id:'2', name:'Big Mini Putt Club – Lakeview', loc:'3655 N Halsted St, Chicago, IL', detour:'~20 min · Kennedy, Addison exit', url:'https://bigminiputtclub.com', ll:[41.949,-87.6495], desc:'9-hole indoor mini golf bar w/ full kitchen'},
+  {id:'3', name:'Ninja Golf!', loc:'Granger, IN (near South Bend)', detour:'~25–30 min south of I-94 via US-12/SR-23', url:'https://www.playninjagolf.com', ll:[41.746,-86.137], desc:'Upscale Japanese-garden 27-hole destination course'},
+  {id:'4', name:'Ella Sharp Park Mini Golf', loc:'3225 4th St, Jackson, MI', detour:'~15–20 min · south side of Jackson', url:'https://www.cityofjackson.org/650/Miniature-Golf', ll:[42.216,-84.411], desc:'Seasonal city-run course in historic Ella Sharp Park'}
+];
+const route = [
+  [42.0910,-88.1580],[42.0460,-88.1430],[42.0330,-88.0800],[42.0080,-88.0100],
+  [41.9900,-87.9400],[41.9770,-87.8700],[41.9660,-87.8200],[41.9600,-87.7550],
+  [41.9400,-87.7200],[41.9100,-87.6800],[41.8900,-87.6600],[41.8750,-87.6440],
+  [41.8520,-87.6350],[41.8100,-87.6310],[41.7800,-87.6150],[41.7500,-87.5650],
+  [41.7300,-87.5300],[41.7060,-87.5150],[41.6700,-87.4400],[41.6200,-87.3300],
+  [41.5900,-87.2500],[41.6200,-87.1500],[41.6350,-87.0550],[41.6560,-86.9300],
+  [41.6900,-86.8500],[41.7250,-86.7800],[41.7600,-86.7300],[41.8000,-86.7000],
+  [41.8600,-86.6400],[41.9300,-86.5570],[41.9800,-86.5100],[42.0400,-86.4600],
+  [42.0800,-86.4300],[42.1200,-86.3600],[42.1800,-86.2500],[42.2100,-86.0500],
+  [42.2170,-85.8900],[42.2300,-85.7200],[42.2280,-85.6000],[42.2270,-85.5300],
+  [42.2400,-85.4200],[42.2700,-85.2600],[42.2850,-85.1800],[42.2750,-85.0500],
+  [42.2600,-84.9500],[42.2550,-84.7500],[42.2600,-84.6000],[42.2700,-84.4600],
+  [42.2750,-84.3000],[42.2700,-84.1500],[42.2950,-84.0200],[42.2900,-83.8700],
+  [42.2700,-83.7900],[42.2810,-83.7480]
+];
+
+const map = L.map('map');
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+const routeLine = L.polyline(route, {color:'#1d4ed8', weight:4, opacity:.8}).addTo(map);
+map.fitBounds(routeLine.getBounds().pad(0.12));
+
+function endIcon(emoji){ return L.divIcon({className:'', html:`<div class="marker-pin pin-end" style="width:32px;height:32px;">${emoji}</div>`, iconSize:[32,32], iconAnchor:[16,16]}); }
+L.marker(route[0], {icon:endIcon('🏠')}).addTo(map).bindPopup('<b>Start:</b> South Barrington, IL');
+L.marker(route[route.length-1], {icon:endIcon('🏁')}).addTo(map).bindPopup('<b>Finish:</b> Ann Arbor, MI');
+
+function pin(id, cls){ return L.divIcon({className:'', html:`<div class="marker-pin ${cls}" style="width:28px;height:28px;">${id}</div>`, iconSize:[28,28], iconAnchor:[14,14]}); }
+function popupHtml(c){ return `<b>${c.id}. ${c.name}</b><br>${c.desc}<br><i>${c.loc}</i><br>Detour: ${c.detour}<br><a href="${c.url}" target="_blank">${c.url.replace('https://','')}</a>`; }
+
+const markers = {};
+const layer15 = L.layerGroup().addTo(map);
+const layer30 = L.layerGroup().addTo(map);
+courses15.forEach(c => { markers[c.id] = L.marker(c.ll, {icon: pin(c.id,'pin15')}).bindPopup(popupHtml(c)).addTo(layer15); });
+courses30.forEach(c => { markers[c.id] = L.marker(c.ll, {icon: pin(c.id,'pin30')}).bindPopup(popupHtml(c)).addTo(layer30); });
+
+function listItem(c, cls){
+  return `<div class="course" onclick="focusCourse('${c.id}')">
+    <div class="badge ${cls}">${c.id}</div>
+    <div><div class="name">${c.name}</div>
+    <div class="meta">${c.loc}</div>
+    <div class="meta">${c.detour}</div>
+    <a href="${c.url}" target="_blank" onclick="event.stopPropagation()">${c.url.replace('https://','').replace('www.','')}</a></div>
+  </div>`;
+}
+document.getElementById('list15').innerHTML = courses15.map(c=>listItem(c,'b15')).join('');
+document.getElementById('list30').innerHTML = courses30.map(c=>listItem(c,'b30')).join('');
+
+function focusCourse(id){
+  const m = markers[id];
+  map.setView(m.getLatLng(), 12);
+  m.openPopup();
+}
+function setTier(t){
+  document.getElementById('btn15').classList.toggle('active', t===15);
+  document.getElementById('btn30').classList.toggle('active', t===30);
+  const show30 = (t===30);
+  if (show30) { layer30.addTo(map); } else { map.removeLayer(layer30); }
+  document.getElementById('list30').style.display = show30 ? '' : 'none';
+  document.getElementById('hdr30').style.display = show30 ? '' : 'none';
+}
+setTier(15);
+</script>
+</body>
+</html>
